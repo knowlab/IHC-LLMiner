@@ -10,7 +10,7 @@ class AbstractClassifier:
     A class to classify PubMed abstracts using a fine-tuned Gemma-2 model.
     """
 
-    def __init__(self, model_path, device='cuda:0', max_tokens=4, temperature=0):
+    def __init__(self, model_path, device='cuda:0', max_new_tokens=4, temperature=0):
         self.device = device
         self.pipe = pipeline(
             "text-generation",
@@ -19,7 +19,7 @@ class AbstractClassifier:
             device=device,
         )
         self.parameters = {
-            "max_new_tokens": max_tokens,
+            "max_new_tokens": max_new_tokens,
             "return_full_text": False,
             "temperature": temperature
         }
@@ -33,7 +33,7 @@ class AbstractClassifier:
         If the article meets all these criteria, output 'Include'. Otherwise, output 'Exclude'.
         \nAbstract: """     
     
-    def classify(self, abstract, systemp_prompt, user_prompt):
+    def classify(self, abstract, system_prompt, user_prompt):
         """
         Classify a single abstract as 'include' or 'exclude'.
         """   
@@ -62,13 +62,15 @@ class AbstractClassifier:
 
 def main():
     parser = argparse.ArgumentParser(description='Classify IHC abstracts using a fine-tuned Gemma-2 model.')
-    parser.add_argument('--model_path', default='', help='Path to the fine-tuned Gemma-2 model.')
+    parser.add_argument('--model_path', default='knowlab-research/IHC-LLMiner-CLS', help='Path to the fine-tuned Gemma-2 model.')
     parser.add_argument('--input_file', required=True, help='TSV file with a column named "abstract".')
     parser.add_argument('--output_file', default='classified_abstracts.json', help='Output JSON file with predictions.')
+    parser.add_argument('--device', default='cuda:0', help='GPU device.')
 
     args = parser.parse_args()
 
-    classifier = AbstractClassifier(model_path=args.model_path)
+    classifier = AbstractClassifier(model_path=args.model_path, 
+        device=args.device)
     classifier.run(
         input_path=args.input_file,
         output_path=args.output_file

@@ -1,9 +1,7 @@
 # IHC-LLMiner
 
 [**Paper**]() | 
-[**🤗 Dataset**]() | 
-[**🤗 Classification Model**]() |
-[**🤗 Extraction Model**]()
+[**🤗 Model and Dataset**](https://huggingface.co/collections/knowlab-research/ihc-llminer-67ebc27792449023e7123f2d) | 
 
 ## Description
 
@@ -25,38 +23,41 @@ pip install .
 
 ## Download Abstracts
 ```bash
-python download.py --markers ER PR CD34 --max_per_marker 9999 --max_per_marker --output pmid_list_w_abstract.tsv
+python download.py --markers BOB1 TTF1 --max_per_marker 9999 --output_file pmid_list_w_abstract.tsv
 ```
 
 ## Classify Abstracts
 ```bash
-python classify_abstracts.py \
+python classify.py \
   --input_file pmid_list_w_abstract.tsv \
   --output_file predictions.json
 ```
 
 ## Extract IHC Profiles
 ```bash
-python extract_information.py \
-  --input_json predictions.json \
-  --output extract_result.tsv
+python extract.py \
+  --input_file predictions.json \
+  --output_file extraction_result.tsv
 ```
 
-## Normalise the Extracted Results
+## Preparation of the UMLS file
 > You would need UMLS metathesaurus downloaded. For this, you would need to log in with your own credential.
-> 
+> Download MRCONSO.RRF from [here](https://www.nlm.nih.gov/research/umls/licensedcontent/umlsknowledgesources.html)
+> then run generate_UMLS_data.ipynb
+
+## Normalise the Extracted Results
 ```bash
-python normalize_umls.py \
-  --model_path /path/to/sapbert_model \
-  --mapping_file evaluation_file_umls2024ab.txt \
-  --input_file extract_result.tsv \
+python normalize.py \
+  --input_file extraction_result.tsv \
   --output_file inference_umls_mapped_data.tsv
 ```
 
 ## Example for downstream analysis of the normalised results
-> Please refer to example/data_analysis.ipynb
+> Please refer to data_analysis.ipynb
+
+## Hardware
+The code was tested with A5000 GPU 24GB memory.
 
 ## Reference
-
 ```bibtex
 ```

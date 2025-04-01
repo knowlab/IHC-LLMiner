@@ -4,6 +4,8 @@ import pandas as pd
 from tqdm import tqdm
 from langdetect import detect
 import argparse
+import warnings
+warnings.filterwarnings("ignore")
 
 class PubMedDownloader:
     """
@@ -18,29 +20,23 @@ class PubMedDownloader:
         self.results = []
 
     def get_pmids(self, term):
-        """
-        Retrieve PMIDs for a given search term using PubMed E-utilities.
-        """
-        base_url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi'
-        params = {
-            'db': 'pubmed',
-            'term': f'{term} immunohisto*',
-            'retmax': 1
-        }
-        r = requests.get(base_url, params=params)
-        try:
-            max_count = int(BeautifulSoup(r.text, 'lxml').find('count').text.strip())
-        except:
-            return []
-
-        pmids = []
-        for start in range(0, max_count, 9999):
-            params.update({'retmax': 9999, 'retstart': start})
-            r = requests.get(base_url, params=params)
-            soup = BeautifulSoup(r.text, 'lxml')
-            ids = [i.text.strip() for i in soup.find_all('id')]
-            pmids.extend(ids)
-        return pmids
+        if int(self.max_per_marker)<10000:
+            r=requests.get(f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term} immunohisto*&RetMax={self.max_per_marker}')
+            soup=BeautifulSoup(r.text)
+            try:
+                return [i.get_text(strip=True) for i in soup.find_all('id')]
+            except:
+                return []
+        else:
+            pmid_list=[]
+            for i in range(0, int(self.max_per_marker), 9999):
+                r=requests.get(f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term} immunohisto*&RetMax=9999&retstart={i}')
+                soup=BeautifulSoup(r.text)
+                try:
+                    pmid_list=pmid_list+[i.get_text(strip=True) for i in soup.find_all('id')]
+                except:
+                    return []
+            return pmid_list
 
     def get_abstract(self, pmid):
         """
@@ -93,12 +89,12 @@ def main():
     parser = argparse.ArgumentParser(description='Download PubMed abstracts for IHC markers.')
     parser.add_argument('--markers', nargs='+', required=True, help='List of IHC marker terms.')
     parser.add_argument('--max_per_marker', type=int, default=20, help='Max abstracts per marker.')
-    parser.add_argument('--output', default='pmid_list_w_abstract.tsv', help='Output TSV file.')
+    parser.add_argument('--output_file', default='pmid_list_w_abstract.tsv', help='Output TSV file.')
 
     args = parser.parse_args()
     downloader = PubMedDownloader(term_list=args.markers,
                             max_per_marker=args.max_per_marker,
-                            output_file=args.output)
+                            output_file=args.output_file)
     downloader.run()
 
 

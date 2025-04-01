@@ -4,6 +4,7 @@ import pandas as pd
 import argparse
 from tqdm import tqdm
 from transformers import pipeline, AutoTokenizer
+import torch
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -29,26 +30,24 @@ class IHCInformationExtractor:
         self._load_pipeline()
 
     def _load_pipeline(self):
-        is_4bit = "medium" in self.model_path
         self.pipe = pipeline(
             "text-generation",
             model=self.model_path,
-            tokenizer=AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True),
+            model_kwargs={"torch_dtype": torch.bfloat16},
             device=self.device,
-            trust_remote_code=True,
-            load_in_4bit=is_4bit if is_4bit else False,
+            trust_remote_code=True
         )
         self.parameters = {
             "max_new_tokens": self.max_new_tokens,
             "return_full_text": False,
-            "temperature": self.temperature,
+            "temperature": self.temperature
         }
 
     def load_data(self, input_file):
         with open(input_file) as f:
             data = json.loads(f.read())
 
-        return [d for d in data['prediction'] if d.lower().strip()=='include']
+        return [d for d in data if d['prediction'].lower().strip()=='include']
 
     def extract(self, data):
         results = []
@@ -67,29 +66,28 @@ class IHCInformationExtractor:
             })
         return pd.DataFrame(results)
 
-    def save_output(self, df, output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-        model_name = os.path.basename(self.model_path.rstrip("/"))
-        filename = f"inference_{model_name}_{self.max_new_tokens}_{self.temperature}.tsv"
-        output_path = os.path.join(output_dir, filename)
+    def run(self, input_path, output_path):
+        """
+        Run extraction on a dataset and save results.
+        """
+        data = self.load_data(input_path)
+        print(f"Running extraction on {len(data)} abstracts...")
+        df = self.extract(data)
         df.to_csv(output_path, sep='\t', index=False)
-        print(f"Saved output to {output_path}")
-
+        print(f"Saved {len(df)} abstracts to {output_path}.")
 
 def main():
     parser = argparse.ArgumentParser(description="IHC Information Extraction using a Generative LLM")
-    parser.add_argument("--model_path", type=str, default='', help="Path to the fine-tuned LLM")
-    parser.add_argument("--input_json", type=str, required=True, help="Path to JSON input file with abstracts")
-    parser.add_argument('--output', default='extracted_abstract.tsv', help='Output TSV file.')
+    parser.add_argument("--model_path", type=str, default='knowlab-research/IHC-LLMiner-IE', help="Path to the fine-tuned LLM")
+    parser.add_argument("--input_file", type=str, required=True, help="Path to JSON input file with abstracts")
+    parser.add_argument('--output_file', default='extracted_abstract.tsv', help='Output TSV file.')
+    parser.add_argument('--device', default='cuda:0', help='GPU device.')
     args = parser.parse_args()
 
     extractor = IHCInformationExtractor(
-        model_path=args.model_path
+        model_path=args.model_path, device=args.device
     )
-
-    data = extractor.load_data(args.input_json)
-    df = extractor.extract(data)
-    extractor.save_output(df, args.output_dir)
+    extractor.run(args.input_file, args.output_file)
 
 
 if __name__ == "__main__":

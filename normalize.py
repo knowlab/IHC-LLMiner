@@ -13,8 +13,27 @@ from scipy.spatial.distance import cdist
 import warnings
 warnings.filterwarnings("ignore")
 
+def normalize_dataframe(df):
+    # Normalize: strip whitespace, lowercase content
+    return df.applymap(lambda x: str(x).strip().lower()).sort_values(by=df.columns.tolist()).reset_index(drop=True)
+
+def parse_markdown_table(md_table):
+    lines = md_table.strip().split('\n')
+    headers = [h.strip().lower() for h in lines[0].strip('|').split('|')]
+    # Check if the second line is a separator
+    if len(lines) > 1 and all(char in "- |" for char in lines[1]):
+        data_start_index = 2  # Skip the separator line
+    else:
+        data_start_index = 1  # No separator line, data starts immediately
+    
+    rows = [
+        dict(zip(headers, [cell.strip() for cell in row.strip('|').split('|')]))
+        for row in lines[data_start_index:]
+    ]
+    return normalize_dataframe(pd.DataFrame(rows))#.to_dict()#orient='records')
+
 class UMLSNormalizer:
-    def __init__(self, model_path, bs=256, device=0):
+    def __init__(self, model_path, bs=512, device='cuda:0'):
         self.bs = bs
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -50,28 +69,21 @@ class UMLSNormalizer:
                 table_columns[i:i+self.bs],
                 padding="max_length", max_length=32, truncation=True, return_tensors="pt"
             )
-            toks_cuda = {k: v.to(self.device) for k, v in toks.items()}
+            toks = {k: v.to(self.device) for k, v in toks.items()}
             with torch.no_grad():
-                output = self.model(**toks_cuda)
-            cls_rep = output[0][:, 0, :].cpu()
+                cls_rep = self.model(**toks)
+            cls_rep = cls_rep[0][:, 0, :].cpu()
 
             all_reps_emb_tensor = torch.tensor(self.all_reps_emb)
             distances = torch.cdist(cls_rep.unsqueeze(0), all_reps_emb_tensor)[0]
             nearest_indices = torch.argmin(distances, dim=-1)
-
+            del toks
+            del cls_rep
+            del all_reps_emb_tensor
+            del distances
             for name, idx in zip(table_columns[i:i+self.bs], nearest_indices):
                 self.umls_mapping[name] = self.umls_id_pairs[idx]
-
-    def parse_markdown_table(self, md_table):
-        lines = md_table.strip().split('\n')
-        headers = [h.strip().lower() for h in lines[0].strip('|').split('|')]
-        data_start_index = 2 if len(lines) > 1 and all(c in "- |" for c in lines[1]) else 1
-        rows = [
-            dict(zip(headers, [cell.strip() for cell in row.strip('|').split('|')]))
-            for row in lines[data_start_index:]
-        ]
-        df = pd.DataFrame(rows)
-        return df.applymap(lambda x: str(x).strip().lower())
+            del nearest_indices
 
     def normalize_table(self, df):
         new_rows = []
@@ -89,23 +101,30 @@ class UMLSNormalizer:
             new_rows.append(new_row)
         return pd.DataFrame(new_rows)
 
-
+    def save_output(self, normalized_tables, output_file):
+        all_data = pd.concat(normalized_tables, ignore_index=True)
+        all_data.replace('', pd.NA, inplace=True)
+        all_data.dropna(axis=1, how='all', inplace=True)
+        all_data = all_data[all_data['tumor site'].fillna('').str.lower() != 'na']
+        all_data = all_data[all_data['tumor site'].fillna('').str.lower() != 'sodium']
+        all_data.to_csv(output_file, sep='\t', index=False)
+        
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, required=True, help="Path to SapBERT model")
-    parser.add_argument("--mapping_file", type=str, required=True, help="UMLS concept file")
+    parser.add_argument("--model_path", type=str, default='knowlab-research/IHC-LLMiner-align', help="Path to SapBERT model")
+    parser.add_argument("--mapping_file", type=str, default='evaluation_file_umls2024ab.txt', help="UMLS concept file")
     parser.add_argument("--input_file", type=str, required=True, help="Path to TSV input file with abstracts extraction results")
     parser.add_argument("--output_file", type=str, default="inference_umls_mapped_data.tsv")
-    parser.add_argument("--device", type=int, default=0)
+    parser.add_argument("--device", type=str, default='cuda:0')
     args = parser.parse_args()
 
     normalizer = UMLSNormalizer(model_path=args.model_path, device=args.device)
     normalizer.load_umls_mappings(args.mapping_file)
 
     # Load and parse all tables
-    df=pd.read_csv(args.input_file, sep='\t')
-    df=df.dropna()
-    tables=df.output.apply(normalizer.parse_markdown_table)
+    tables=pd.read_csv(args.input_file, sep='\t')
+    tables=tables.dropna()
+    tables=tables.output.apply(parse_markdown_table)
     
     # Extract all unique column names (for normalization)
     column_set = set()
@@ -120,21 +139,12 @@ def main():
     normalizer.normalize_column_names(sorted(set(column_set)))
 
     # Normalize each table and append PMIDs
-    normalized_tables = []
-    for file_path, table in zip(table_files, tables):
-        pmid = os.path.basename(file_path).split('.')[0]
-        norm_table = normalizer.normalize_table(table)
-        norm_table['pmid'] = pmid
-        normalized_tables.append(norm_table)
+    normalized_tables=[]
+    for idx, table in tqdm(enumerate(tables),total=len(tables)):
+        normalized_tables.append(pd.DataFrame(normalizer.normalize_table(table)))
 
-    all_data = pd.concat(normalized_tables, ignore_index=True)
-    all_data.replace('', pd.NA, inplace=True)
-    all_data.dropna(axis=1, how='all', inplace=True)
-    all_data = all_data[all_data['tumor site'].fillna('').str.lower() != 'na']
-    all_data = all_data[all_data['tumor site'].fillna('').str.lower() != 'sodium']
-    all_data.to_csv(args.output_file, sep='\t', index=False)
+    normalizer.save_output(normalized_tables, args.output_file)
     print(f"Saved normalized output to {args.output_file}")
-
 
 if __name__ == "__main__":
     main()

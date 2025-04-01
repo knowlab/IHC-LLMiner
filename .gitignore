@@ -1,0 +1,37 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+ihc_llminer.egg-info/
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+
+# PyInstaller
+*.spec
+
+# VSCode config
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# result files
+*.tsv
+*.txt
+*.json
