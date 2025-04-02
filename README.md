@@ -1,6 +1,6 @@
 # IHC-LLMiner
 
-[**Paper**]() | 
+[**Paper**](https://arxiv.org/abs/2504.00748v1) | 
 [**🤗 Model and Dataset**](https://huggingface.co/collections/knowlab-research/ihc-llminer-67ebc27792449023e7123f2d) | 
 
 ## Description
@@ -60,4 +60,13 @@ The code was tested with A5000 GPU 24GB memory.
 
 ## Reference
 ```bibtex
+@misc{kim2025ihcllminer,
+      title={IHC-LLMiner: Automated extraction of tumour immunohistochemical profiles from PubMed abstracts using large language models}, 
+      author={Yunsoo Kim and Michal W. S. Ong and Daniel W. Rogalsky and Manuel Rodriguez-Justo and Honghan Wu and Adam P. Levine},
+      year={2025},
+      eprint={2504.00748},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2504.00748}, 
+}
 ```
