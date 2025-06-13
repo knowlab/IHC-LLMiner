@@ -112,7 +112,7 @@ class UMLSNormalizer:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, default='knowlab-research/IHC-LLMiner-align', help="Path to SapBERT model")
-    parser.add_argument("--mapping_file", type=str, default='evaluation_file_umls2024ab.txt', help="UMLS concept file")
+    parser.add_argument("--mapping_file", type=str, default='evaluation_file_umls2025aa.txt', help="UMLS concept file")
     parser.add_argument("--input_file", type=str, required=True, help="Path to TSV input file with abstracts extraction results")
     parser.add_argument("--output_file", type=str, default="inference_umls_mapped_data.tsv")
     parser.add_argument("--device", type=str, default='cuda:0')
