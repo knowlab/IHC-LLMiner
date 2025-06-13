@@ -42,7 +42,7 @@ python extract.py \
 
 ## Preparation of the UMLS file
 > You would need UMLS metathesaurus downloaded. For this, you would need to log in with your own credential.
-> Download MRCONSO.RRF from [here](https://www.nlm.nih.gov/research/umls/licensedcontent/umlsknowledgesources.html)
+> Download Full Subset from [here](https://www.nlm.nih.gov/research/umls/licensedcontent/umlsknowledgesources.html)
 > then run generate_UMLS_data.ipynb
 
 ## Normalise the Extracted Results
